@@ -23,28 +23,17 @@ const PUBLIC_URL_KV_KEY = "deployment:public-url"
 // hydration fills it in from KV. A configured value always wins.
 const configuredPublicUrl = new WeakMap<object, boolean>()
 
-/**
- * Put the generated secret and the deployment's own origin on `env`, so the
- * call sites that encrypt tokens or build callback URLs can stay synchronous.
- * Runs before any handler, and inside the agent, which has no request to read
- * an origin from.
- */
-/** Which provider a model API key belongs to, from its prefix. */
 export function providerForModelKey(
 	key: string,
-): "anthropic" | "openai" | "google" | "xai" | null {
+): "anthropic" | "openai" | "google" | "xai" | "openrouter" | null {
 	if (key.startsWith("sk-ant-")) return "anthropic"
+	if (key.startsWith("sk-or-")) return "openrouter"
 	if (key.startsWith("xai-")) return "xai"
 	if (key.startsWith("AIza")) return "google"
 	if (key.startsWith("sk-")) return "openai"
 	return null
 }
 
-/**
- * The deploy button prompts for every secret it knows about, so a deployment
- * asks for one MODEL_API_KEY and it lands on whichever provider it belongs to.
- * A provider-specific variable set explicitly always wins.
- */
 function applyModelApiKey(env: Env): void {
 	const key = env.MODEL_API_KEY?.trim()
 	if (!key) return
@@ -61,9 +50,12 @@ function applyModelApiKey(env: Env): void {
 		case "xai":
 			env.XAI_API_KEY ||= key
 			return
+		case "openrouter":
+			env.OPENROUTER_API_KEY ||= key
+			return
 		default:
 			console.warn(
-				"[setup] MODEL_API_KEY doesn't look like an Anthropic, OpenAI, Google or xAI key; set the provider's own variable instead.",
+				"[setup] MODEL_API_KEY doesn't look like an Anthropic, OpenAI, Google, xAI or OpenRouter key; set the provider's own variable instead.",
 			)
 	}
 }

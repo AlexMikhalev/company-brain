@@ -7,6 +7,7 @@ interface Env {
 	OPENAI_API_KEY?: string
 	GOOGLE_GENERATIVE_AI_API_KEY?: string
 	XAI_API_KEY?: string
+	OPENROUTER_API_KEY?: string
 	DAYTONA_API_KEY?: string
 	/** Public origin of this worker, used for OAuth redirects and Slack links. */
 	PUBLIC_URL: string

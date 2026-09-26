@@ -15,6 +15,15 @@ import { brainFallbackModelFor } from "./model-profile"
 // Sentinel the gateway swaps for its stored provider key (BYOK).
 const GATEWAY_INJECTED_KEY = "CF_TEMP_TOKEN"
 
+const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+const OPENROUTER_VENDOR: Record<SupportedModelProvider, string> = {
+	anthropic: "anthropic",
+	openai: "openai",
+	google: "google",
+	xai: "x-ai",
+}
+
 /** Best model this deployment can reach, per provider. */
 const PROVIDER_DEFAULT_MODEL: Record<SupportedModelProvider, SupportedModel> = {
 	anthropic: "claude-sonnet-5",
@@ -39,7 +48,14 @@ function providerKey(
 	}
 }
 
-/** Providers this deployment has a key for, in preference order. */
+function openRouterKey(env: Env): string | undefined {
+	return env.OPENROUTER_API_KEY?.trim() || undefined
+}
+
+function canReach(provider: SupportedModelProvider, env: Env): boolean {
+	return Boolean(providerKey(provider, env)?.trim() || openRouterKey(env))
+}
+
 export function availableProviders(env: Env): SupportedModelProvider[] {
 	const order: SupportedModelProvider[] = [
 		"anthropic",
@@ -47,21 +63,30 @@ export function availableProviders(env: Env): SupportedModelProvider[] {
 		"google",
 		"xai",
 	]
-	return order.filter((provider) => providerKey(provider, env)?.trim())
+	return order.filter((provider) => canReach(provider, env))
 }
 
-/**
- * The requested model when its provider has a key, otherwise the best model
- * from a provider that does. A deployment with one key still runs every
- * feature; it just runs them all on that provider.
- */
+export function openRouterModelId(modelName: SupportedModel): string {
+	const { provider, canonicalName } = getModelInfo(modelName)
+	return `${OPENROUTER_VENDOR[provider]}/${canonicalName ?? modelName}`
+}
+
+function openRouterModel(modelName: SupportedModel, apiKey: string) {
+	return createOpenAI({
+		name: "openrouter",
+		apiKey,
+		baseURL: OPENROUTER_BASE_URL,
+		headers: { "X-Title": "Company Brain" },
+	}).chat(openRouterModelId(modelName))
+}
+
 function resolveModel(modelName: SupportedModel, env: Env): SupportedModel {
 	const { provider } = getModelInfo(modelName)
-	if (providerKey(provider, env)?.trim()) return modelName
+	if (canReach(provider, env)) return modelName
 	const fallbackProvider = availableProviders(env)[0]
 	if (!fallbackProvider) {
 		const error = new Error(
-			"No model provider key is set. Set MODEL_API_KEY to an Anthropic, OpenAI, Google or xAI key.",
+			"No model provider key is set. Set MODEL_API_KEY to an Anthropic, OpenAI, Google, xAI or OpenRouter key.",
 		)
 		captureException(error, { tags: { feature: "company_brain" } })
 		throw error
@@ -86,6 +111,11 @@ export function brainProviderModel(
 	apiKeyOverride?: string,
 ): LanguageModel {
 	const { modelId, provider } = getModelInfo(modelName)
+	const directKey = providerKey(provider, env)?.trim()
+	const routerKey = openRouterKey(env)
+	if (apiKeyOverride === undefined && !directKey && routerKey) {
+		return openRouterModel(modelName, routerKey)
+	}
 	const apiKey = apiKeyOverride ?? providerKey(provider, env) ?? ""
 	switch (provider) {
 		case "xai":
@@ -137,12 +167,9 @@ export function getBrainModel(modelName: SupportedModel, env: Env) {
 	const key = gateway ? GATEWAY_INJECTED_KEY : undefined
 	const candidates = [brainProviderModel(resolved, env, key)]
 	const fallback = brainFallbackModelFor(resolved)
-	if (fallback !== resolved && (gateway || providerHasKey(fallback, env))) {
+	const fallbackReachable = canReach(getModelInfo(fallback).provider, env)
+	if (fallback !== resolved && (gateway || fallbackReachable)) {
 		candidates.push(brainProviderModel(fallback, env, key))
 	}
 	return wrapBrainGateway(env, candidates)
-}
-
-function providerHasKey(modelName: SupportedModel, env: Env): boolean {
-	return Boolean(providerKey(getModelInfo(modelName).provider, env)?.trim())
 }
