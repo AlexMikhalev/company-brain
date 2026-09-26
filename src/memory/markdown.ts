@@ -20,8 +20,6 @@ function labelsFor(memory: BrainMemory): string[] {
 	]
 }
 
-// One memory per list item: fold line breaks so a multi-line memory can't
-// break out of its bullet, and escape characters that would start markup.
 function memoryLine(memory: BrainMemory): string {
 	const text = memory.memory
 		.replace(/\s*\n\s*/g, " ")
@@ -33,11 +31,6 @@ function memoryLine(memory: BrainMemory): string {
 	return `- ${text} _(${meta})_`
 }
 
-/**
- * What the brain remembers, as one Markdown file a person can read, grep,
- * diff or drop into a wiki. Memories are listed newest first under the
- * container they came from, so shared and private memories stay apart.
- */
 export function memoriesToMarkdown(params: {
 	orgName: string | null
 	exportedAt: Date
@@ -69,7 +62,6 @@ export function memoriesToMarkdown(params: {
 	return `${lines.join("\n")}\n`
 }
 
-/** `company-brain-memories-2026-09-25.md` */
 export function memoryExportFilename(exportedAt: Date): string {
 	return `company-brain-memories-${exportedAt.toISOString().slice(0, 10)}.md`
 }

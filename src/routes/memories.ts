@@ -9,8 +9,6 @@ import { memoriesToMarkdown, memoryExportFilename } from "../memory/markdown"
 import { listBrainMemories } from "../memory/memories"
 
 const RECENT_LIMIT = 8
-// Upper bound for one export, per container. Reading is paged 100 at a time,
-// so two containers stay inside the free plan's 50 subrequests per request.
 export const EXPORT_LIMIT = 2000
 
 async function memoryCount(env: Env, containerTag: string): Promise<number> {
@@ -49,11 +47,6 @@ export const brainMemoriesRoutes = new Hono<AppContext>()
 			})),
 		})
 	})
-	/**
-	 * Everything the viewer can see, as a Markdown download: the shared team
-	 * brain and their own private memories. Same containers as the home page,
-	 * so an export never includes a teammate's private memories.
-	 */
 	.get("/export", async (c) => {
 		const user = c.get("user")
 		const org = c.get("org")
