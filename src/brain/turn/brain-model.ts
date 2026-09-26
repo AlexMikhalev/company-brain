@@ -17,8 +17,6 @@ const GATEWAY_INJECTED_KEY = "CF_TEMP_TOKEN"
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-// OpenRouter names models `<vendor>/<model>`, and its vendor prefixes don't
-// always match ours.
 const OPENROUTER_VENDOR: Record<SupportedModelProvider, string> = {
 	anthropic: "anthropic",
 	openai: "openai",
@@ -54,15 +52,10 @@ function openRouterKey(env: Env): string | undefined {
 	return env.OPENROUTER_API_KEY?.trim() || undefined
 }
 
-/** Whether a provider's models are reachable, directly or through OpenRouter. */
 function canReach(provider: SupportedModelProvider, env: Env): boolean {
 	return Boolean(providerKey(provider, env)?.trim() || openRouterKey(env))
 }
 
-/**
- * Providers this deployment can reach, in preference order. An OpenRouter key
- * reaches all of them, so every model stays on the menu.
- */
 export function availableProviders(env: Env): SupportedModelProvider[] {
 	const order: SupportedModelProvider[] = [
 		"anthropic",
@@ -73,7 +66,6 @@ export function availableProviders(env: Env): SupportedModelProvider[] {
 	return order.filter((provider) => canReach(provider, env))
 }
 
-/** The OpenRouter slug for one of our models, like `anthropic/claude-sonnet-5`. */
 export function openRouterModelId(modelName: SupportedModel): string {
 	const { provider, canonicalName } = getModelInfo(modelName)
 	return `${OPENROUTER_VENDOR[provider]}/${canonicalName ?? modelName}`
@@ -88,11 +80,6 @@ function openRouterModel(modelName: SupportedModel, apiKey: string) {
 	}).chat(openRouterModelId(modelName))
 }
 
-/**
- * The requested model when its provider has a key, otherwise the best model
- * from a provider that does. A deployment with one key still runs every
- * feature; it just runs them all on that provider.
- */
 function resolveModel(modelName: SupportedModel, env: Env): SupportedModel {
 	const { provider } = getModelInfo(modelName)
 	if (canReach(provider, env)) return modelName
@@ -125,8 +112,6 @@ export function brainProviderModel(
 ): LanguageModel {
 	const { modelId, provider } = getModelInfo(modelName)
 	const directKey = providerKey(provider, env)?.trim()
-	// A provider's own key wins; OpenRouter covers the providers without one.
-	// The AI Gateway (apiKeyOverride) holds provider keys itself, so it stays direct.
 	const routerKey = openRouterKey(env)
 	if (apiKeyOverride === undefined && !directKey && routerKey) {
 		return openRouterModel(modelName, routerKey)
