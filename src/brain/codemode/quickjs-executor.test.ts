@@ -74,6 +74,22 @@ describe("QuickJSExecutor", () => {
 		expect(hung.error).toBe("Execution timed out")
 	})
 
+	it("fails fast on values JSON can't carry, instead of timing out", async () => {
+		const start = Date.now()
+		const circular = await executor.execute(
+			`async () => { const a = {}; a.self = a; return a }`,
+			[people],
+		)
+		expect(circular.error).toMatch(/circular/i)
+		const bigint = await executor.execute(`async () => 10n`, [people])
+		expect(bigint.error).toMatch(/bigint/i)
+		const fromTool = await executor.execute(`async () => odd.big()`, [
+			{ name: "odd", fns: { big: async () => 10n } },
+		])
+		expect(fromTool.error).toMatch(/bigint/i)
+		expect(Date.now() - start).toBeLessThan(1_000)
+	})
+
 	it("turns connector pause and error signals into throws", async () => {
 		const binding = {
 			callTool: async (method: string, args: unknown) =>

@@ -158,7 +158,9 @@ export class QuickJSExecutor implements Executor {
 				.filter((p) => !connectorNames.has(p.name) && p.prelude)
 				.map((p) => p.prelude as string),
 			`(async () => await (${normalizeCode(code)})())().then(
-	(value) => __host_done(JSON.stringify({ result: value === undefined ? null : value, undefined: value === undefined })),
+	(value) => JSON.stringify({ result: value === undefined ? null : value, undefined: value === undefined }),
+).then(
+	__host_done,
 	(err) => __host_done(JSON.stringify({ error: err && err.message !== undefined ? err.message : String(err) })),
 );`,
 		].join("\n")
@@ -195,11 +197,12 @@ export class QuickJSExecutor implements Executor {
 			const deferred = ctx.newPromise()
 			pending.add(deferred)
 			run()
-				.catch((error) => ({ error: errorMessage(error) }))
-				.then((envelope) => {
+				.then((envelope) => JSON.stringify(envelope))
+				.catch((error) => JSON.stringify({ error: errorMessage(error) }))
+				.then((json) => {
 					if (!alive) return
 					pending.delete(deferred)
-					const value = ctx.newString(JSON.stringify(envelope))
+					const value = ctx.newString(json)
 					deferred.resolve(value)
 					value.dispose()
 				})
