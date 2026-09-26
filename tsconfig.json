@@ -4,7 +4,7 @@
 		"lib": ["ES2022"],
 		"module": "ESNext",
 		"moduleResolution": "bundler",
-		"types": ["./worker-configuration.d.ts"],
+		"types": ["./worker-configuration.d.ts", "node"],
 		"strict": true,
 		"noUncheckedIndexedAccess": true,
 		"skipLibCheck": true,
